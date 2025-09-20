@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salbot AI Career Advisor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" xintegrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoVBL5gI9kLmbG0CzdlIQroYYEntgA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" xintegrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chat-bubble-user { background-color: #2563EB; color: white; }
+        .chat-bubble-assistant { background-color: #F3F4F6; color: #1F2937; }
+        .gradient-bg { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+        #chat-container.active { display: flex; flex-direction: column; height: auto; max-height: 50vh; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex flex-col items-center justify-between p-4 md:p-6">
+
+    <main id="app-container" class="w-full h-full flex flex-col items-center">
+        <!-- Intro Container -->
+        <div id="intro-container" class="text-center my-auto">
+            <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-lg">
+                <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Salbot</h1>
+                <p class="mt-4 text-lg text-gray-600">Your AI-Powered Career Advisor for India</p>
+                <p class="mt-2 text-sm text-gray-500">Tell me about your interests, skills, and aspirations to get started. You can also upload your resume for a more personalized analysis!</p>
+            </div>
+        </div>
+
+        <!-- Loading Container -->
+        <div id="loading-container" class="hidden text-center my-auto">
+             <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-lg flex flex-col items-center gap-4">
+                <svg class="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p id="loading-text" class="text-lg text-gray-600 w-64 transition-all duration-300">Performing analysis...</p>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="results-container" class="hidden w-full max-w-4xl mx-auto bg-white/80 backdrop-blur-md p-6 md:p-8 rounded-2xl shadow-lg mt-6">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
+                <h2 class="text-3xl font-bold text-gray-800">Your Career Toolkit</h2>
+                <button id="pdf-download-btn" class="hidden bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center gap-2 disabled:bg-blue-400 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-circle hidden animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                    <span>Download PDF</span>
+                </button>
+            </div>
+            <div id="profile-summary"></div>
+            <div id="career-recommendations" class="mt-6"></div>
+            <div id="skills-roadmap" class="mt-6"></div>
+            <div id="resume-feedback" class="mt-6"></div>
+            <div id="interview-prep" class="mt-6"></div>
+            <div id="job-postings" class="mt-6"></div>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="chat-container" class="hidden w-full max-w-4xl mx-auto mt-4">
+            <div id="chat-history" class="overflow-y-auto p-4 space-y-4 bg-white/60 backdrop-blur-sm rounded-t-xl h-full"></div>
+        </div>
+    </main>
+
+    <!-- Input Form -->
+    <form id="chat-form" class="w-full max-w-4xl mx-auto p-4 bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl mt-4">
+        <div class="relative">
+            <input type="text" id="user-input" class="w-full p-4 pr-12 bg-gray-100 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 transition" placeholder="Ask a follow-up question or describe a new career to analyze..." autocomplete="off">
+            <button type="submit" id="submit-btn" class="absolute inset-y-0 right-0 flex items-center justify-center w-12 h-full text-blue-600 hover:text-blue-800 transition duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></svg>
+            </button>
+        </div>
+        <div class="mt-2 flex items-center justify-between">
+            <label for="resume-upload" class="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 cursor-pointer transition">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.59a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                Attach Resume (PDF)
+            </label>
+            <input id="resume-upload" type="file" class="hidden" accept=".pdf">
+            <span id="file-name" class="text-sm text-gray-500 ml-2 truncate max-w-xs"></span>
+        </div>
+    </form>
+
+<script>
+    const form = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
+    const resumeInput = document.getElementById('resume-upload');
+    const fileNameSpan = document.getElementById('file-name');
+    const chatHistory = document.getElementById('chat-history');
+    const loadingText = document.getElementById('loading-text');
+    const threadId = 'student_' + Date.now();
+    let loadingInterval;
+    
+    form.addEventListener('submit', handleSubmit);
+    resumeInput.addEventListener('change', () => { fileNameSpan.textContent = resumeInput.files.length > 0 ? resumeInput.files[0].name : ''; });
+    document.getElementById('pdf-download-btn').addEventListener('click', downloadPDF);
+
+    function startLoadingAnimation() {
+        const messages = ["Analyzing your profile...", "Identifying top career matches...", "Gathering market insights...", "Building learning roadmaps...", "Checking your resume...", "Preparing interview questions...", "Compiling your toolkit..."];
+        let messageIndex = 0;
+        loadingText.textContent = messages[messageIndex];
+        loadingInterval = setInterval(() => { messageIndex = (messageIndex + 1) % messages.length; loadingText.textContent = messages[messageIndex]; }, 2000);
+    }
+
+    function stopLoadingAnimation() {
+        clearInterval(loadingInterval);
+        loadingText.textContent = 'Performing analysis...';
+    }
+
+    async function handleSubmit(event) {
+        event.preventDefault();
+        const userQuery = userInput.value.trim();
+        const resumeFile = resumeInput.files[0];
+        if (!userQuery && !resumeFile) return;
+
+        const chatContainer = document.getElementById('chat-container');
+        const introContainer = document.getElementById('intro-container');
+        const loadingContainer = document.getElementById('loading-container');
+        
+        if (!chatContainer.classList.contains('active')) {
+            introContainer.classList.add('hidden');
+            loadingContainer.classList.remove('hidden');
+            startLoadingAnimation();
+        }
+        
+        appendMessage('user', userQuery + (resumeFile ? `\n[Attached: ${resumeFile.name}]` : ''));
+        showChatLoadingIndicator();
+        userInput.value = '';
+        resumeInput.value = '';
+        fileNameSpan.textContent = '';
+        userInput.disabled = true;
+
+        try {
+            let response;
+            if (resumeFile) {
+                const formData = new FormData();
+                formData.append('query', userQuery);
+                formData.append('resume_pdf', resumeFile);
+                formData.append('thread_id', threadId);
+                response = await fetch('/api/query', { method: 'POST', body: formData });
+            } else {
+                response = await fetch('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: userQuery, thread_id: threadId }), });
+            }
+
+            removeChatLoadingIndicator();
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.statusText}`);
+            
+            const data = await response.json();
+
+            if (data.careers && Array.isArray(data.careers)) {
+                renderInitialAnalysis(data);
+                appendMessage('assistant', data.message);
+                if (!chatContainer.classList.contains('active')) {
+                    stopLoadingAnimation();
+                    loadingContainer.classList.add('hidden');
+                    document.getElementById('results-container').classList.remove('hidden');
+                    chatContainer.classList.add('active');
+                    chatContainer.classList.remove('hidden');
+                }
+            } else if (data.message) {
+                appendMessage('assistant', data.message);
+            } else if (data.error) {
+                 appendMessage('assistant-error', `Sorry, an error occurred: ${data.error}`);
+            } else {
+                appendMessage('assistant-error', 'Sorry, I received an unexpected response.');
+            }
+
+        } catch (error) {
+            console.error('Fetch error:', error);
+            removeChatLoadingIndicator();
+            appendMessage('assistant-error', 'Sorry, I couldn\'t connect to the server.');
+        } finally {
+            userInput.disabled = false;
+            userInput.focus();
+            stopLoadingAnimation();
+        }
+    }
+
+    function appendMessage(role, content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `p-4 rounded-xl max-w-xl prose ${role === 'user' ? 'chat-bubble-user self-end' : role === 'assistant-error' ? 'bg-red-100 text-red-800' : 'chat-bubble-assistant self-start'}`;
+        messageDiv.innerHTML = `<p>${content.replace(/\n/g, '<br>')}</p>`;
+        chatHistory.appendChild(messageDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function showChatLoadingIndicator() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'chat-loading';
+        loadingDiv.className = 'chat-bubble-assistant self-start p-4 flex items-center space-x-2';
+        loadingDiv.innerHTML = `<div class="w-2 h-2 bg-gray-500 rounded-full animate-pulse" style="animation-delay: 0s;"></div><div class="w-2 h-2 bg-gray-500 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div><div class="w-2 h-2 bg-gray-500 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div>`;
+        chatHistory.appendChild(loadingDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function removeChatLoadingIndicator() {
+        document.getElementById('chat-loading')?.remove();
+    }
+    
+    function renderInitialAnalysis(data) {
+        const sections = {
+            'profile-summary': { title: 'Profile Snapshot', content: data.profile_summary },
+            'career-recommendations': { title: 'Top Career Recommendations', content: data.careers?.map(c => `<div class="p-4 border rounded-lg mb-4 bg-white"><h4 class="text-lg font-bold text-blue-700">${c.career}</h4><p class="text-sm text-gray-600 mt-1"><strong>Why it's a fit:</strong> ${c.rationale}</p><p class="text-sm text-gray-600 mt-1"><strong>Job Outlook:</strong> <span class="font-semibold">${c.outlook}</span></p></div>`).join('') },
+            'skills-roadmap': { title: 'Skills & Learning Roadmap', content: Object.entries(data.skills || {}).map(([name, dets]) => `<div class="p-4 border rounded-lg mb-4 bg-white"><h4 class="text-lg font-bold text-blue-700">${name}</h4><div class="mt-2"><h5 class="font-semibold">Skill Gaps:</h5><ul class="list-disc list-inside text-gray-600 text-sm pl-2">${Object.values(dets.gaps || {}).map(g => `<li>${g}</li>`).join('')}</ul></div><div class="mt-3"><h5 class="font-semibold">Learning Steps:</h5><ol class="list-decimal list-inside text-gray-600 text-sm pl-2 space-y-2 mt-1">${dets.roadmap?.steps?.map(s => `<li><strong>${s.step}</strong> (Timeline: ${s.timeline})<br>${s.resources.map(r => `<a href="${r}" target="_blank" class="text-blue-600 hover:underline text-xs">${r}</a>`).join('<br>')}</li>`).join('') || 'No steps.'}</ol></div></div>`).join('') },
+            'resume-feedback': { title: 'Resume Feedback', content: data.resume_feedback?.suggestions?.length > 0 ? `<p>${data.resume_feedback.feedback_summary}</p><ul class="list-disc list-inside text-gray-600 text-sm pl-2 mt-2">${data.resume_feedback.suggestions.map(s => `<li>${s}</li>`).join('')}</ul>` : `<p class="text-gray-500">${data.resume_feedback?.feedback_summary || 'No feedback available.'}</p>` },
+            'interview-prep': { title: 'Interview Preparation', content: Object.entries(data.interview_prep || {}).map(([name, dets]) => `<div class="p-4 border rounded-lg mb-4 bg-white"><h4 class="text-lg font-bold text-blue-700">${name}</h4><div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4"><div class="tech-questions"><h5 class="font-semibold">Technical Questions:</h5><ul class="list-disc list-inside text-gray-600 text-sm pl-2">${dets.technical?.map(q => `<li>${q}</li>`).join('')}</ul></div><div class="behavioral-questions"><h5 class="font-semibold">Behavioral Questions:</h5><ul class="list-disc list-inside text-gray-600 text-sm pl-2">${dets.behavioral?.map(q => `<li>${q}</li>`).join('')}</ul></div></div></div>`).join('') },
+            'job-postings': { title: 'Simulated Job Board', content: Object.entries(data.job_postings || {}).map(([name, posts]) => `<div class="p-4 border rounded-lg mb-4 bg-white"><h4 class="text-lg font-bold text-blue-700">${name} Postings</h4><div class="mt-2 space-y-3">${posts.map(p => `<div class="border-l-4 border-blue-200 pl-3"><p class="font-semibold">${p.title} at ${p.company} <span class="text-xs font-normal text-gray-500">- ${p.location}</span></p><p class="text-sm text-gray-600">${p.summary}</p></div>`).join('')}</div></div>`).join('') }
+        };
+
+        for (const [id, data] of Object.entries(sections)) {
+            const container = document.getElementById(id);
+            if (container && data.content && data.content.length > 0) {
+                container.innerHTML = `<h3 class="text-xl font-semibold text-gray-700 mb-2">${data.title}</h3>` + (id === 'profile-summary' ? `<p class="text-gray-600">${data.content}</p>` : data.content);
+                container.classList.remove('hidden');
+            } else if (container) {
+                container.innerHTML = '';
+                container.classList.add('hidden');
+            }
+        }
+        
+        document.getElementById('pdf-download-btn').classList.remove('hidden');
+    }
+
+    // **MODIFIED**: PDF generation function for better structure
+    async function downloadPDF() {
+        const downloadButton = document.getElementById('pdf-download-btn');
+        const resultsContainer = document.getElementById('results-container');
+        const downloadIcon = downloadButton.querySelector('.lucide-download');
+        const spinnerIcon = downloadButton.querySelector('.lucide-loader-circle');
+        const buttonText = downloadButton.querySelector('span');
+
+        downloadButton.disabled = true;
+        downloadIcon.classList.add('hidden');
+        spinnerIcon.classList.remove('hidden');
+        buttonText.textContent = 'Generating...';
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'p',
+                unit: 'pt',
+                format: 'a4'
+            });
+
+            // Temporarily hide the button so it's not in the PDF
+            downloadButton.style.display = 'none';
+
+            await pdf.html(resultsContainer, {
+                callback: function(doc) {
+                    doc.save('Salbot-Career-Toolkit.pdf');
+                    
+                    // Restore button and state after saving is complete
+                    downloadButton.style.display = 'flex';
+                    downloadButton.disabled = false;
+                    downloadIcon.classList.remove('hidden');
+                    spinnerIcon.classList.add('hidden');
+                    buttonText.textContent = 'Download PDF';
+                },
+                margin: [40, 30, 40, 30], // [top, left, bottom, right] in points
+                autoPaging: 'text',
+                width: 535, // A4 width in points (595) minus horizontal margins (30+30)
+                windowWidth: resultsContainer.scrollWidth // Use the element's full width for rendering
+            });
+
+        } catch (error) {
+            console.error("Failed to generate PDF:", error);
+            alert("Sorry, there was an error creating the PDF.");
+            // Restore button state on error
+            downloadButton.disabled = false;
+            downloadIcon.classList.remove('hidden');
+            spinnerIcon.classList.add('hidden');
+            buttonText.textContent = 'Download PDF';
+            downloadButton.style.display = 'flex';
+        }
+    }
+</script>
+</body>
+</html>
+
