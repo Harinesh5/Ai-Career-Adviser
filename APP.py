@@ -9,18 +9,16 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 import logging
 from dotenv import load_dotenv
-import fitz  # PyMuPDF
+import fitz  
 import urllib.parse
 
-# Load environment variables from .env file
+
 load_dotenv()
 
-# --- Basic Flask App Setup ---
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
 
-# --- LLM and LangGraph Configuration ---
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 if not API_KEY:
@@ -37,7 +35,6 @@ except Exception as e:
     logging.error(f"Failed during initialization: {e}")
 
 
-# --- State and Agent Definitions ---
 def last_write_wins(x, y):
     return y
 
@@ -53,7 +50,6 @@ class SalbotState(TypedDict):
     user_query: Annotated[str, last_write_wins]
     final_response: Annotated[Dict[str, Any], last_write_wins]
     intent: Annotated[str, last_write_wins]
-    # **NEW**: Flag to explicitly track if a resume was part of the query
     resume_uploaded: Annotated[bool, last_write_wins]
 
 
@@ -70,7 +66,6 @@ def invoke_llm(prompt: ChatPromptTemplate, inputs: Dict[str, Any]) -> Dict[str, 
         logging.error(f"LLM invocation error: {e}")
         return {"error": str(e)}
 
-# --- Agent Definitions (with corrected prompts) ---
 
 router_system = "You are a routing agent. Determine the user's intent. If they ask about a new career, classify as 'new_analysis'. If they ask a related question, classify as 'follow_up'. Respond ONLY with JSON: {{\"intent\": \"follow_up\"}} or {{\"intent\": \"new_analysis\"}}"
 router_prompt = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template(router_system), HumanMessagePromptTemplate.from_template("History: {history}\n\nUser's new query: {query}")])
@@ -101,7 +96,6 @@ def career_agent(state: SalbotState):
     state["career_recommendations"] = recommendations_data.get("careers", [])
     return state
 
-# --- PARALLEL AGENTS ---
 def skills_agent_parallel(state: SalbotState):
     skills_system = "You are the Skills Analyzer. For each recommended career, identify skill gaps and generate learning roadmaps with suggested resources. DO NOT MAKE UP URLs. For resources, just name the course and platform (e.g., 'Python for Everybody on Coursera'). Output JSON: {{ \"skills\": {{\"career1\": {{\"gaps\": [...], \"roadmap\": {{\"steps\": [{{\"step\": \"Learn Python\", \"resources\": [\"Python for Everybody on Coursera\"], ...}}]}} }}}}}}"
     skills_prompt = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template(skills_system), HumanMessagePromptTemplate.from_template("Profile: {profile}\nCareers: {careers}")])
@@ -133,13 +127,11 @@ def market_agent_parallel(state: SalbotState):
     return state
 
 def resume_agent_parallel(state: SalbotState) -> SalbotState:
-    # **MODIFIED**: This agent now has a gatekeeper. It only runs if a resume was uploaded.
     if not state.get("resume_uploaded"):
         logging.info("Skipping resume agent as no resume was uploaded.")
         state["resume_feedback"] = {"feedback_summary": "No resume was uploaded for this analysis.", "suggestions": []}
         return state
 
-    # **MODIFIED**: The prompt is now simpler because it assumes a resume is always present when it runs.
     resume_system = "You are a Resume Advisor. The user has uploaded their resume. Analyze the resume text provided in their query, compare it to the skills required for the recommended careers, and provide specific, actionable feedback. Output JSON: {{\"feedback_summary\": \"...\", \"suggestions\": [...]}}."
     resume_prompt = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template(resume_system), HumanMessagePromptTemplate.from_template("User's query with resume text: {user_query}\nRecommended careers: {careers}")])
     
@@ -167,7 +159,6 @@ def job_board_agent_parallel(state: SalbotState) -> SalbotState:
     state["job_postings"] = postings_data.get("postings", {})
     return state
 
-# --- Collector and Final Response Agents ---
 def collect_results_agent(state: SalbotState) -> SalbotState:
     logging.info("All parallel analyses have completed. Collecting results.")
     return state
@@ -201,7 +192,6 @@ def follow_up_agent(state: SalbotState):
     state["conversation_history"].append({"role": "assistant", "content": final_response_package["message"]})
     return state
 
-# --- LangGraph Workflow with Link Generation ---
 workflow = StateGraph(SalbotState)
 workflow.add_node("router_agent", router_agent)
 workflow.add_node("profile_agent", profile_agent)
@@ -240,7 +230,6 @@ workflow.add_edge("follow_up_agent", END)
 checkpointer = MemorySaver()
 langgraph_app = workflow.compile(checkpointer=checkpointer)
 
-# --- Flask API ---
 @app.route('/api/query', methods=['POST'])
 def handle_query():
     if not llm: return jsonify({"error": "LLM not initialized. Please check your API key."}), 500
@@ -270,7 +259,6 @@ def handle_query():
     config = {"configurable": {"thread_id": thread_id}}
     
     try:
-        # Pass both the query and the resume flag into the graph's initial state
         initial_state = {"user_query": full_query, "resume_uploaded": resume_uploaded_flag}
         result = langgraph_app.invoke(initial_state, config=config)
         final_response = result.get("final_response", {"error": "No response generated."})
